@@ -6,9 +6,11 @@
     </form> -->
         <div class="row row-cols-lg-3 row-cols-md-2 row-cols-sm-1" >
             <% for(let listing of allListings){ %>
+                <% const placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='100%25' height='100%25' fill='%23f1f1f1'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23777' font-family='Arial' font-size='28'%3ENo%20Image%3C/text%3E%3C/svg%3E"; %>
+                <% const imageUrl = (listing.image && listing.image.url) ? listing.image.url : (typeof listing.image === "string" ? listing.image : placeholder); %>
                 <a href="/listings/<%= listing._id %>" class="listing-link">
                     <div class="card col listing-card" >
-                    <img src="<%= listing.image.url %>" class="card-img-top" alt="listing_image" style="height: 20rem">
+                    <img src="<%= imageUrl %>" class="card-img-top" alt="listing_image" style="height: 20rem" onerror="this.onerror=null;this.src='<%= placeholder %>';">
                     <div class="card-img-overlay"></div>
                     <div class="card-body">
                         <p class="card-text">

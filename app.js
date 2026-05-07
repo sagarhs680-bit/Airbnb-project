@@ -1,5 +1,5 @@
 
- //now we can access evn in everywhere
+//now we can access evn in everywhere
 if(process.env.NODE_ENV !="production"){
     require('dotenv').config()
 }
@@ -10,6 +10,8 @@ const app = express();
 const mongoose = require("mongoose");
 const path = require("path");
 const methodOverride = require("method-override");
+const morgan = require("morgan");
+const promClient = require("prom-client");
 
 const ejsMate = require("ejs-mate")
 const wrapAsync = require("./utils/wrapAsync.js");
@@ -30,6 +32,9 @@ const userRouter=require("./routes/user.js");
 const listingsRouter =require("./routes/listing.js");
 const reviewsRouter = require("./routes/review.js");
 
+const PORT = process.env.PORT || 8000;
+const MONGO_URL = process.env.MONGO_URL || "mongodb://127.0.0.1:27017/wonderlust";
+
 main().then(() => {
     console.log("connected to db");
 }).catch((err) => {
@@ -37,7 +42,7 @@ main().then(() => {
 })
 
 async function main() {
-    await mongoose.connect('mongodb://127.0.0.1:27017/wonderlust');
+    await mongoose.connect(MONGO_URL);
 }
 
 
@@ -48,9 +53,44 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride("_method"));
 app.use(express.static(path.join(__dirname, "public")));
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+
+const metricsRegistry = new promClient.Registry();
+promClient.collectDefaultMetrics({ register: metricsRegistry });
+const httpRequestsTotal = new promClient.Counter({
+    name: "http_requests_total",
+    help: "Total HTTP requests",
+    labelNames: ["method", "route", "status"],
+    registers: [metricsRegistry],
+});
+app.use((req, res, next) => {
+    res.on("finish", () => {
+        const route = req.route?.path || req.path;
+        httpRequestsTotal.inc({
+            method: req.method,
+            route,
+            status: String(res.statusCode),
+        });
+    });
+    next();
+});
+
+app.get("/health", (req, res) => {
+    const dbState = mongoose.connection.readyState; // 1 = connected
+    res.status(dbState === 1 ? 200 : 503).json({
+        status: dbState === 1 ? "ok" : "degraded",
+        db: dbState,
+        uptime: process.uptime(),
+    });
+});
+
+app.get("/metrics", async (req, res) => {
+    res.set("Content-Type", metricsRegistry.contentType);
+    res.end(await metricsRegistry.metrics());
+});
 
 const sessionOptions={
-    secret:"mysupersecreatecode",
+    secret: process.env.SESSION_SECRET || "mysupersecreatecode",
     resave:false,
     saveUninitialized:true,
     cookie:{
@@ -131,6 +171,6 @@ app.use((err, req, res, next) => {
 
 });
 
-app.listen(8000, () => {
-    console.log("server is listening on 8000");
+app.listen(PORT, () => {
+    console.log(`server is listening on ${PORT}`);
 })

@@ -1,15 +1,21 @@
-const mongoose=require("mongoose");
-const Listing=require("../models/listing.js");
-const initData=require("./data.js");
+if (process.env.NODE_ENV !== "production") {
+    require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
+}
 
-main().then(()=>{
+const mongoose = require("mongoose");
+const Listing = require("../models/listing.js");
+const initData = require("./data.js");
+
+const MONGO_URL = process.env.MONGO_URL || "mongodb://127.0.0.1:27017/wonderlust";
+
+main().then(() => {
     console.log("connected to db");
-}).catch((err)=>{
+}).catch((err) => {
     console.log(err);
 })
 
-async function main(){
-    await mongoose.connect('mongodb://127.0.0.1:27017/wonderlust');
+async function main() {
+    await mongoose.connect(MONGO_URL);
 }
 
 
@@ -21,4 +27,10 @@ const initDB=async()=>{
     console.log("initialized successfully");
 }
 
-initDB();
+(async () => {
+  try {
+    await initDB();
+  } finally {
+    await mongoose.disconnect();
+  }
+})();
